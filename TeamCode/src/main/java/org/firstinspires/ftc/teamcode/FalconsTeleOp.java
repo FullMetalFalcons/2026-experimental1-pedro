@@ -1,18 +1,23 @@
 package org.firstinspires.ftc.teamcode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 
 @TeleOp
+@Configurable
 public class FalconsTeleOp extends OpMode {
     //Initialize motors, servos, sensors, imus, etc.
-    DcMotorEx motorLF, motorRF, motorLB, motorRB;
-    // TODO: Uncomment the following line if you are using servos
-    //Servo claw;
+    DcMotorEx motorLF, motorRF, motorLB, motorRB, motorWorm, motorSlide;
+    Servo servoClaw;
+
+    double servoOn = 0.5, servoOff = 0.2;
+    boolean servoOpen = false;
 
     // The following code will run as soon as "INIT" is pressed on the Driver Station
     @Override
@@ -25,28 +30,38 @@ public class FalconsTeleOp extends OpMode {
         motorLB = (DcMotorEx) hardwareMap.dcMotor.get( Constants.driveConstants.leftRearMotorName );
         motorRF = (DcMotorEx) hardwareMap.dcMotor.get( Constants.driveConstants.rightFrontMotorName );
         motorRB = (DcMotorEx) hardwareMap.dcMotor.get( Constants.driveConstants.rightRearMotorName );
+        motorWorm = (DcMotorEx) hardwareMap.dcMotor.get("worm");
+        motorSlide = (DcMotorEx) hardwareMap.dcMotor.get("slide");
+
+        servoClaw = (Servo) hardwareMap.servo.get("claw");
+
 
         // Use the following line as a template for defining new servos
         //claw = (Servo) hardwareMap.servo.get("claw");
 
         // Reverse certain drive motors so that positive power to all motors makes the robot move forwards
-        // TODO: Update "Constants" with the proper directions of your drive motors
         motorLF.setDirection( Constants.driveConstants.leftFrontMotorDirection );
         motorLB.setDirection( Constants.driveConstants.leftRearMotorDirection );
         motorRF.setDirection( Constants.driveConstants.rightFrontMotorDirection );
         motorRB.setDirection( Constants.driveConstants.rightRearMotorDirection );
+        motorWorm.setDirection(DcMotorSimple.Direction.FORWARD);
+        motorSlide.setDirection(DcMotorSimple.Direction.FORWARD);
 
         // This resets the encoder values when the code is initialized
         motorLF.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
         motorLB.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
         motorRF.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
         motorRB.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+        motorWorm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        motorSlide.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         // This makes the wheels tense up and stay in position when it is not moving, opposite is FLOAT
         motorLF.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
         motorLB.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
         motorRF.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
         motorRB.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+        motorWorm.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+        motorSlide.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
 
         // This lets you look at encoder values while the OpMode is active
         // If you have a STOP_AND_RESET_ENCODER, make sure to put this below it
@@ -54,6 +69,8 @@ public class FalconsTeleOp extends OpMode {
         motorLB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         motorRF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         motorRB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        motorWorm.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        motorSlide.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
     }
 
@@ -90,11 +107,37 @@ public class FalconsTeleOp extends OpMode {
         powerRF /= max;
         powerRB /= max;
 
-        motorLF.setPower(powerLF);
-        motorLB.setPower(powerLB);
-        motorRF.setPower(powerRF);
-        motorRB.setPower(powerRB);
+        motorLF.setPower(0.75*powerLF);
+        motorLB.setPower(0.75*powerLB);
+        motorRF.setPower(0.75*powerRF);
+        motorRB.setPower(0.75*powerRB);
 
+
+        // ARM LOGIC
+        if (gamepad1.rightBumperWasPressed()) {
+            servoOpen = !servoOpen;
+        }
+        if (servoOpen) {
+            servoClaw.setPosition(servoOn);
+        } else {
+            servoClaw.setPosition(servoOff);
+        }
+
+        if (gamepad1.left_bumper) {
+            motorWorm.setPower(0.5);
+        } else if (gamepad1.left_trigger > 0.2) {
+            motorWorm.setPower(-0.5);
+        } else {
+            motorWorm.setPower(0);
+        }
+
+        if (gamepad1.dpad_up) {
+            motorSlide.setPower(0.5);
+        } else if (gamepad1.dpad_down) {
+            motorSlide.setPower(-0.5);
+        } else {
+            motorSlide.setPower(0);
+        }
 
 
         // This type of boolean is a new addition to the FTC SDK
@@ -110,8 +153,10 @@ public class FalconsTeleOp extends OpMode {
         //     the variable that you list after the comma will be displayed next to the label
         // update() only needs to be run once and will "push" all of the added data
 
-        //telemetry.addData("Label", "Information");
-        //telemetry.update();
+        telemetry.addData("slidePos", motorSlide.getCurrentPosition());
+        telemetry.addData("wormPos", motorWorm.getCurrentPosition());
+        telemetry.addData("servoPos", servoClaw.getPosition());
+        telemetry.update();
 
     }
 
